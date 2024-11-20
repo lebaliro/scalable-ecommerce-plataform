@@ -1,0 +1,116 @@
+services:
+  nginx:
+    image: nginx:latest
+    container_name: nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - user-service
+      - catalog-service
+      - keycloak
+    networks:
+      - ecommerce-network
+  
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    container_name: keycloak
+    environment:
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=admin
+      - DB_VENDOR=postgres
+      - DB_ADDR=keycloak-db
+      - DB_DATABASE=keycloak
+      - DB_USER=keycloak
+      - DB_PASSWORD=keycloak
+    ports:
+      - "8080:8080"
+    command: start-dev
+    volumes:
+      - ./keycloak-data:/opt/keycloak/data
+    # depends_on:
+    #   - keycloak-db
+    networks:
+      - ecommerce-network
+
+  # keycloak-db:
+  #   image: postgres:13
+  #   container_name: keycloak-db
+  #   environment:
+  #     POSTGRES_USER: keycloak
+  #     POSTGRES_PASSWORD: keycloak
+  #     POSTGRES_DB: keycloak
+  #   ports:
+  #     - "5433:5432"
+  #   volumes:
+  #     - ./keycloak-db-data:/var/lib/postgresql/data
+  #   networks:
+  #     - ecommerce-network
+
+  user-service:
+    image: user-service-image
+    build:
+      context: ./user-service
+    environment:
+      - DATABASE_HOST=user-db
+      - DATABASE_PORT=5432
+      - CLIENT_ID=nginx-gateway
+      - CLIENT_SECRET=TGWQmAK0EuPVxxt86AI0c36AZCq6B92T
+      - KEYCLOAK_URL=http://nginx:80
+    depends_on:
+      - user-db
+    volumes:
+      - ./user-service:/app
+    networks:
+      - ecommerce-network
+    working_dir: /app
+
+  catalog-service:
+    image: catalog-service-image
+    build:
+      context: ./catalog-service
+    environment:
+      - DATABASE_HOST=user-db
+      - DATABASE_PORT=5432
+    # depends_on:
+    #   - user-db
+    volumes:
+      - ./catalog-service:/app
+    networks:
+      - ecommerce-network
+    working_dir: /app
+
+  user-db:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: your_username
+      POSTGRES_PASSWORD: your_password
+      POSTGRES_DB: your_database
+    ports:
+      - "5432:5432"
+    volumes:
+      - user-db-data:/var/lib/postgresql/data
+    networks:
+      - ecommerce-network
+
+  pgadmin:
+    image: dpage/pgadmin4
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - user-db
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+
+volumes:
+  user-db-data:
+  pgadmin-data:
+  keycloak-data:
+
+networks:
+  ecommerce-network:
+    driver: bridge
