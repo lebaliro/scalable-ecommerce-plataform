@@ -57,5 +57,3 @@ class TestUser(APITestCase):
         self.login()
 
         response = self.client.get(url)
-
-        print(response.content)
